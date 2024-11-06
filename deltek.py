@@ -1,6 +1,7 @@
 """Functions to fetch and print timetable records from Deltek Maconomy."""
 
 import base64
+import json
 import os
 
 import requests
@@ -34,6 +35,14 @@ def read_timetables(encoded_credentials: str = "", username: str = "", password:
         list[dict]: List of timetable records.
     """
 
+    try:
+        with open("timesheets.json", "r") as fp:
+            data = json.load(fp)
+            if data:
+                return data["panes"]["filter"]["records"]
+    except Exception:
+        pass
+
     if not encoded_credentials and os.environ["DELTEK_CREDENTIALS"]:
         encoded_credentials = os.environ["DELTEK_CREDENTIALS"]
 
@@ -54,7 +63,7 @@ def read_timetables(encoded_credentials: str = "", username: str = "", password:
         "Accept": "application/vnd.deltek.maconomy.containers-v2+json",
     }
 
-    url = "https://me52774-webclient.deltekfirst.com/maconomy-api/containers/me52774/dailytimesheetlines/filter"
+    url = "https://me52774-webclient.deltekfirst.com/maconomy-api/containers/me52774/dailytimesheetlines/filter?limit=0"
 
     response = requests.get(url, headers=headers, timeout=30)
 
@@ -63,6 +72,9 @@ def read_timetables(encoded_credentials: str = "", username: str = "", password:
 
     timetable = response.json()
     records = timetable["panes"]["filter"]["records"]
+
+    with open("timesheets.json", "w") as fp:
+        json.dump(timetable, fp)
 
     return records
 
@@ -93,6 +105,9 @@ def print_records(records: list[dict]) -> None:
 
     print("")
     print(f" {bonus_tot} total hours contributing to bonus")
+
+
+# def is_
 
 
 if __name__ == "__main__":
