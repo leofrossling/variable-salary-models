@@ -65,6 +65,7 @@ def read_timetables(encoded_credentials: str = "", username: str = "", password:
 
     url = "https://me52774-webclient.deltekfirst.com/maconomy-api/containers/me52774/dailytimesheetlines/filter?limit=0"
 
+    print("Fetching time report lines")
     response = requests.get(url, headers=headers, timeout=30)
 
     if not response.status_code == 200:
