@@ -1,4 +1,6 @@
 import json
+import os
+import math
 
 from deltek import read_timetables
 
@@ -33,6 +35,8 @@ def daily_result(record: dict, unknown: dict):
         match res['taskname']:
             case "181":
                 bonus_type = "bonus"
+            case "280":
+                bonus_type = "förtroendeuppdrag"
             case _:
                 bonus_type = "internal"
         res['type'] = bonus_type
@@ -106,11 +110,13 @@ def print_report(report):
 
 def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
 
-    base_salary = 10000
-    rlon = 93
-    rtot = 2000
-    rlin = 40
+    rtot_val = int(os.environ["RTOTAL"])
+    rlin_val = int(os.environ["RLIN"])
+    rlon_val = math.ceil(rlin_val + rtot_val / 38)
 
+    print("")
+    print(f"Numerical values used: Rtotal={rtot_val} kr, Rlinjär={rlin_val} kr, Rlön={rlon_val} kr")
+    print("")
     unknown = {}
 
     years = {}
@@ -123,7 +129,7 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
             report[year] = {}
         year_bonus_hours = 0
 
-        rtot_bank = extra_bonus_hours_from_december
+        rtot_bank = extra_bonus_hours_from_december # extra hours not compensated are carried into the next year
         rtot_count = 0.0
         rlin_count = 0
         rlon_count = 0
@@ -132,10 +138,14 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
                 report[year][month] = {
                     'records':[]
                 }
+            rlon_billable = 0
             monthly_billable_hours = 0
             monthly_bonus_hours = 0
             monthly_non_bonus_hours = 0
             monthly_unknown_hours = 0
+            rlin_vacation_hours = 0
+            rlon_vacation_hours = 0
+            vab_equivalent_hours = 0
 
             last_day_was_billable=False
             for day in records[year][month].keys():
@@ -153,39 +163,62 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
                             monthly_bonus_hours += parsed_record['hours']
                             day_is_billable="Yes"
                         case "vacation":
+                            monthly_bonus_hours += parsed_record['hours']
+                            if last_day_was_billable:
+                                rlon_vacation_hours += parsed_record['hours']
+                            if month in ["07", "08", "12", "01"]:
+                                rlin_vacation_hours += parsed_record['hours']
+                            parsed_record['type'] += " /w bonus"
+                            day_is_billable="Vacay"
+                        case "förtroendeuppdrag":
                             if last_day_was_billable:
                                 monthly_bonus_hours += parsed_record['hours']
+                                rlon_billable += parsed_record['hours']
                                 parsed_record['type'] += " /w bonus"
-                            day_is_billable="Vacay"
+                            day_is_billable="Förtroendeuppdrag"
+                        case "VAB" | "Föräldraledighet":
+                            vab_equivalent_hours += parsed_record['hours']
                         case "bonus":
                             monthly_bonus_hours += parsed_record['hours']
                 
+                # This is relevant for how to count vacay or fiduciary duties,
+                # as they count the same as "surrounding time".
+                # TODO: Inquire with finance on how this is calculated when ending
+                #       assignment during vacation.
                 if day_is_billable == "No":
                     last_day_was_billable=False
                 elif day_is_billable == "Yes":
                     last_day_was_billable=True
 
-            if monthly_bonus_hours >= total_hours_per_month:
-                rtot_count += 1
-                report[year][month]['Rtotal'] = 'True, with %.1fh hours extra' % (monthly_bonus_hours - total_hours_per_month)
-
-                rtot_bank += monthly_bonus_hours - total_hours_per_month
-                extra_bonus_hours_from_december = monthly_bonus_hours - total_hours_per_month
+            rtotal_required_hours = total_hours_per_month - vab_equivalent_hours
+            if monthly_bonus_hours >= rtotal_required_hours:
+                rtot_increment = 1
+                if vab_equivalent_hours > 0:
+                    rtot_increment = min(1.0, monthly_bonus_hours / total_hours_per_month)
+                rtot_count += 1 
+                excess_bonus_hours = monthly_bonus_hours - rtotal_required_hours
+                report[year][month]['Rtotal'] = 'True, with %.1fh hours extra' % (excess_bonus_hours)
+                rtot_bank += excess_bonus_hours
+                extra_bonus_hours_from_december = excess_bonus_hours
             else:
-                extra_bonus_hours_from_december = 0
-                if monthly_bonus_hours + rtot_bank >= total_hours_per_month:
+                extra_bonus_hours_from_december = 0 
+                if monthly_bonus_hours + rtot_bank >= rtotal_required_hours:
                     rtot_count += 1
-                    report[year][month]['Rtotal'] = 'True, using %.1fh from hour bank' % (total_hours_per_month - monthly_bonus_hours)
-                    rtot_bank -= total_hours_per_month - monthly_bonus_hours
+                    report[year][month]['Rtotal'] = 'True, using %.1fh from hour bank' % (rtotal_required_hours - monthly_bonus_hours)
+                    rtot_bank -= rtotal_required_hours - monthly_bonus_hours
                 else:
                     report[year][month]['Rtotal'] = False
             year_bonus_hours += monthly_bonus_hours
 
-            h = max(monthly_billable_hours - 130, 0)
-            rlin_count += h
-            rlon_count += h
-            report[year][month]['Rlin'] = h
-            report[year][month]['Rlön'] = h
+            rlin_threshold = 130
+            if rlin_vacation_hours > 0:
+                rlin_threshold = max(min(130,monthly_billable_hours / total_hours_per_month * 130),0) 
+            h_lin = max(monthly_billable_hours - rlin_threshold, 0)
+            h_lon = max(monthly_billable_hours + rlon_vacation_hours + rlon_billable - 130, 0)
+            rlin_count += h_lin
+            rlon_count += h_lon
+            report[year][month]['Rlin'] = h_lin
+            report[year][month]['Rlön'] = h_lon
             report[year][month]['rtot_bank'] = rtot_bank
             
             
@@ -195,7 +228,7 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
             if year_bonus_hours >= yearly_hours:
                 rtot_count = 12 + min(1, (year_bonus_hours - yearly_hours) / total_hours_per_month)
                 report[year]['Rtotal'] = "More bonus hours than hours in year. Hard at work!"
-                extra_bonus_hours_from_december = 0
+                extra_bonus_hours_from_december = 0 # extra bonus hours only carry over if not paid out by excess hours previous year
             else:
                 if rtot_count < 11:
                     report[year]['Rtotal'] = "Within 40 hours of all hours in year, meaning you got %d retroactively" % (11 - rtot_count)
@@ -207,13 +240,16 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
         years[year] = {"rtot": rtot_count, "rlin": rlin_count, "rlon": rlon_count}
 
         print(f"-- {year} --")
-        print(f"  {rtot_count=}")
-        print(f"  {rlin_count=}")
-        print(f"  {rlon_count=}")
+        print(f"  {rtot_count=}st")
+        print(f"  {rlin_count=:.1f}h")
+        print(f"  {rlon_count=:.1f}h")
         print(f"  {json.dumps(unknown, indent=2)}")
         print("")
-        
-    print_report(report)
+        print(f"  Total current: {rtot_count:.1f}*{rtot_val} + {rlin_count:.1f}*{rlin_val}=")
+        print(f"                 {rtot_count*rtot_val + rlin_count*rlin_val:.0f} kr")
+        print(f"  Total new:     {rlon_count:.1f}*{rlon_val}=")
+        print(f"                 {rlon_count*rlon_val:.0f} kr")
+    return report
 
 
 def sort_records(records: list[dict]) -> dict:
@@ -244,7 +280,9 @@ def the_main_program():
 
     print("Calculate variable salary per year")
     print("")
-    calculate_years(records)
+    report = calculate_years(records)
+    if "VERBOSE" in os.environ and os.environ["VERBOSE"].lower() == "true":
+        print_report(report)
 
 
 if __name__ == "__main__":
