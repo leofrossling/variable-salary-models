@@ -6,6 +6,12 @@ import os
 
 import requests
 
+class UnauthorizedException(Exception):
+    
+    def __init__(self, message, reason):
+        self.message = message
+        super().__init__(self.message)
+        self.reason = reason
 
 def read_timetables(encoded_credentials: str = "", username: str = "", password: str = "") -> list[dict]:
     """
@@ -42,13 +48,13 @@ def read_timetables(encoded_credentials: str = "", username: str = "", password:
                 return data["panes"]["filter"]["records"]
     except Exception:
         pass
-
-    if not encoded_credentials and os.environ["DELTEK_CREDENTIALS"]:
+    
+    if not encoded_credentials and "DELTEK_CREDENTIALS" in os.environ:
         encoded_credentials = os.environ["DELTEK_CREDENTIALS"]
 
     if not encoded_credentials:
-        password = password if password else (os.environ["DELTEK_PASSWORD"] if os.environ["DELTEK_PASSWORD"] else "")
-        username = username if username else (os.environ["DELTEK_USERNAME"] if os.environ["DELTEK_USERNAME"] else "")
+        password = password if password else (os.environ["DELTEK_PASSWORD"] if "DELTEK_PASSWORD" in os.environ else "")
+        username = username if username else (os.environ["DELTEK_USERNAME"] if "DELTEK_USERNAME" in os.environ else "")
 
         if username and password:
             credentials = f"{username}:{password}"
@@ -67,6 +73,13 @@ def read_timetables(encoded_credentials: str = "", username: str = "", password:
 
     print("Fetching time report lines")
     response = requests.get(url, headers=headers, timeout=30)
+
+    if response.status_code == 401:
+        err = response.json()
+        reason = "unknown"
+        if 'errorMessage' in err:
+            reason = err['errorMessage']
+        raise UnauthorizedException("Request unauthorized", reason)
 
     if not response.status_code == 200:
         raise Exception(f"Error fetching timetables: {response.reason}")

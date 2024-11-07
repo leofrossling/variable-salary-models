@@ -2,8 +2,9 @@ import json
 import os
 import math
 import calendar as cal
+from getpass import getpass
 
-from deltek import read_timetables
+from deltek import read_timetables, UnauthorizedException
 from holiday_api import get_easter_holidays, get_ascension_day, get_midsummers_eve
 
 def day_to_string(date):
@@ -195,6 +196,7 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
         if year not in report:
             report[year] = {}
         year_bonus_hours = 0
+        year_lon_hours = 0
         hours_by_month: list[int] = get_monthly_billable_hours_by_year(int(year))
         rtot_bank = extra_bonus_hours_from_december # extra hours not compensated are carried into the next year
         rtot_count = 0.0
@@ -283,6 +285,7 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
                 rlin_threshold = max(min(130,monthly_billed_hours / hour_for_month * 130),0) 
             h_lin = max(monthly_billed_hours - rlin_threshold, 0)
             h_lon = max(monthly_billed_hours + rlon_vacation_hours + rlon_billable - 130, 0)
+            year_lon_hours += monthly_billed_hours
             rlin_count += h_lin
             rlon_count += h_lon
             report[year][month]['Rlin'] = h_lin
@@ -308,9 +311,12 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
         years[year] = {"rtot": rtot_count, "rlin": rlin_count, "rlon": rlon_count}
 
         print(f"-- {year} --")
-        print(f"  {rtot_count=}st")
-        print(f"  {rlin_count=:.1f}h")
-        print(f"  {rlon_count=:.1f}h")
+        print(f"  Rtotal payments: {rtot_count}st")
+        print(f"  Rlinear hours:   {rlin_count:.1f}h")
+        print(f"  Rlön hours:      {rlon_count:.1f}h")
+        if year_lon_hours != year_bonus_hours:
+            rtot_hours_lost= year_bonus_hours - year_lon_hours
+            print(f"  Previous Rtotal hours lost: {rtot_hours_lost:.1f}h")
         if len(unknown.keys()) > 0:
             print(f"  {json.dumps(unknown, indent=2)}")
         print("")
@@ -342,15 +348,42 @@ def sort_records(records: list[dict]) -> dict:
 
 
 def the_main_program():
-    print("Welcome to the Salary Calculator")
-    records = read_timetables()
-    print("Sorting time sheet lines")
+    print("")
+    print("")
+    print("~~~ Welcome to the Salary Calculator ~~~")
+    if "VERBOSE" not in os.environ or os.environ["VERBOSE"].lower() != "true":
+        print("")
+        print(f"  To diplay more information, run with envar VERBOSE=true")
+    records = []
+    try:
+        records = read_timetables()
+    except Exception:
+        print("Enter username: ")
+        username = input()
+        password = getpass()
+        try:
+            records = read_timetables(username=username, password=password)
+        except UnauthorizedException as ue:
+            print("Unable to execute program")
+            print("  Could not download time sheets due to: ")
+            print(f"   {ue.reason}")
+            print("")
+            print("exiting...")
+            return
+        except Exception as e:
+            print("Unable to execute program due to unexpected error")
+            print("  errorMessage: " + str(e))
+            print("")
+            print("exiting...")
+            return
+            
     records = sort_records(records)
 
-    print("Calculate variable salary per year")
     print("")
     report = calculate_years(records)
     if "VERBOSE" in os.environ and os.environ["VERBOSE"].lower() == "true":
+        print("")
+        input("Press enter to diplay monthly breakdown")
         print_report(report)
 
 
