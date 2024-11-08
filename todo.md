@@ -6,5 +6,7 @@
 
 Additional:
 - [ ] Create simple gui app
+- [ ] Generate HTML report
 - [x] Allow ppl to enter credentials and Rtotal/Rlin salary values
 - [ ] Allow ppl to manually register time codes as billable, bonus, vacay, vab, internal, etc.
+- [ ] Pre-approved abscene and such

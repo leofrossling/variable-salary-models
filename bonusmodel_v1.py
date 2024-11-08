@@ -4,7 +4,7 @@ import math
 import calendar as cal
 from getpass import getpass
 
-from deltek import read_timetables, UnauthorizedException
+from deltek import read_dailysheetlines, UnauthorizedException
 from holiday_api import get_easter_holidays, get_ascension_day, get_midsummers_eve
 
 def day_to_string(date):
@@ -138,11 +138,15 @@ def print_report(report):
         for month in report[year].keys():
             if month == "Rtotal":
                 continue
-            print(f"{year}-{month}")
+            print(f"{year}-{month}  -  Hours for month: {report[year][month]['hours']}h")
+            print(f"  Hour thresholds: ")
+            print(f"    Rtotal: {report[year][month]['hours_adjusted_rtotal']}")
+            print(f"    Rlin: {report[year][month]['hours_adjusted_rlin']}")
+            print(f"    Rlön: {report[year][month]['hours_adjusted_rlon']}")
             print(f"  Received Rtotal={report[year][month]['Rtotal']}")
             print(f"  Rtotal hour bank={report[year][month]['rtot_bank']:.1f}h")
             print(f"  Received Rlin={report[year][month]['Rlin']:.1f}h")
-            print(f"  Received Rlon={report[year][month]['Rlön']:.1f}h")
+            print(f"  Received Rlön={report[year][month]['Rlön']:.1f}h")
             print("")
 
             grouped_month = {}
@@ -260,7 +264,10 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
                     last_day_was_billable=True
 
             hour_for_month = hours_by_month[int(month) - 1]
+            report[year][month]['hours'] = hour_for_month
+
             rtotal_required_hours = hour_for_month - vab_equivalent_hours
+            report[year][month]['hours_adjusted_rtotal'] = rtotal_required_hours
             if monthly_bonus_hours >= rtotal_required_hours:
                 rtot_increment = 1
                 if vab_equivalent_hours > 0:
@@ -283,7 +290,10 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
             rlin_threshold = 130
             if rlin_vacation_hours > 0:
                 rlin_threshold = max(min(130,monthly_billed_hours / hour_for_month * 130),0) 
+            report[year][month]['hours_adjusted_rlin'] = rlin_threshold
             h_lin = max(monthly_billed_hours - rlin_threshold, 0)
+
+            report[year][month]['hours_adjusted_rlon'] = 130
             h_lon = max(monthly_billed_hours + rlon_vacation_hours + rlon_billable - 130, 0)
             year_lon_hours += monthly_billed_hours
             rlin_count += h_lin
@@ -356,13 +366,13 @@ def the_main_program():
         print(f"  To diplay more information, run with envar VERBOSE=true")
     records = []
     try:
-        records = read_timetables()
+        records = read_dailysheetlines()
     except Exception:
         print("Enter username: ")
         username = input()
         password = getpass()
         try:
-            records = read_timetables(username=username, password=password)
+            records = read_dailysheetlines(username=username, password=password)
         except UnauthorizedException as ue:
             print("Unable to execute program")
             print("  Could not download time sheets due to: ")
@@ -389,8 +399,4 @@ def the_main_program():
 
 if __name__ == "__main__":
     the_main_program()
-    # for year in range(20):
-    #     print(f"Year: {2010 + year}")
-    #     total = sum(get_monthly_billable_hours_by_year(2010 + year))
-    #     print(f"Monthly avg for {2024 + year}={total * 8 / 12:.1f}")
         

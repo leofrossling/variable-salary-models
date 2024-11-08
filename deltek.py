@@ -13,7 +13,53 @@ class UnauthorizedException(Exception):
         super().__init__(self.message)
         self.reason = reason
 
-def read_timetables(encoded_credentials: str = "", username: str = "", password: str = "") -> list[dict]:
+def verbose_active() -> bool:
+    return "VERBOSE" in os.environ and os.environ["VERBOSE"].lower() == "true"
+
+def construct_auth_credentials(encoded_credentials: str = "", username: str = "", password: str = "") -> str:
+    if not encoded_credentials and "DELTEK_CREDENTIALS" in os.environ:
+        encoded_credentials = os.environ["DELTEK_CREDENTIALS"]
+
+    if not encoded_credentials:
+        password = password if password else (os.environ["DELTEK_PASSWORD"] if "DELTEK_PASSWORD" in os.environ else "")
+        username = username if username else (os.environ["DELTEK_USERNAME"] if "DELTEK_USERNAME" in os.environ else "")
+
+        if username and password:
+            credentials = f"{username}:{password}"
+            encoded_credentials = base64.b64encode(credentials.encode("utf-8")).decode("utf-8")
+
+    if not encoded_credentials or not isinstance(encoded_credentials, str):
+        raise Exception("No valid authentication provided...")
+    
+    return encoded_credentials
+
+def deltek_request(url: str, encoded_credentials: str) -> dict:
+    
+    headers = {
+        "Authorization": f"Basic {encoded_credentials}",
+        "Accept-Language": "en-US",
+        "Accept": "application/vnd.deltek.maconomy.containers-v2+json",
+    }
+
+    if verbose_active():
+        print(f">> Outgoing request to {url}" )
+    response = requests.get(url, headers=headers, timeout=30)
+
+    if response.status_code == 401:
+        err = response.json()
+        reason = "unknown"
+        if 'errorMessage' in err:
+            reason = err['errorMessage']
+        raise UnauthorizedException("Request unauthorized", reason)
+
+    if not response.status_code == 200:
+        raise Exception(f"Error fetching timetables: {response.reason}")
+
+    return response.json()
+
+
+
+def read_dailysheetlines(username: str = "", password: str = "") -> list[dict]:
     """
     Read user timetables from Deltek Maconomy.
 
@@ -45,46 +91,18 @@ def read_timetables(encoded_credentials: str = "", username: str = "", password:
         with open("timesheets.json", "r") as fp:
             data = json.load(fp)
             if data:
+                if verbose_active():
+                    print("Timesheet loaded from cached file")
                 return data["panes"]["filter"]["records"]
     except Exception:
         pass
     
-    if not encoded_credentials and "DELTEK_CREDENTIALS" in os.environ:
-        encoded_credentials = os.environ["DELTEK_CREDENTIALS"]
-
-    if not encoded_credentials:
-        password = password if password else (os.environ["DELTEK_PASSWORD"] if "DELTEK_PASSWORD" in os.environ else "")
-        username = username if username else (os.environ["DELTEK_USERNAME"] if "DELTEK_USERNAME" in os.environ else "")
-
-        if username and password:
-            credentials = f"{username}:{password}"
-            encoded_credentials = base64.b64encode(credentials.encode("utf-8")).decode("utf-8")
-
-    if not encoded_credentials or not isinstance(encoded_credentials, str):
-        raise Exception("No valid authentication provided...")
-
-    headers = {
-        "Authorization": f"Basic {encoded_credentials}",
-        "Accept-Language": "en-US",
-        "Accept": "application/vnd.deltek.maconomy.containers-v2+json",
-    }
-
+    encoded_credentials = construct_auth_credentials(username=username,password=password)
+    
     url = "https://me52774-webclient.deltekfirst.com/maconomy-api/containers/me52774/dailytimesheetlines/filter?limit=0"
 
-    print("Fetching time report lines")
-    response = requests.get(url, headers=headers, timeout=30)
+    timetable = deltek_request(url, encoded_credentials)
 
-    if response.status_code == 401:
-        err = response.json()
-        reason = "unknown"
-        if 'errorMessage' in err:
-            reason = err['errorMessage']
-        raise UnauthorizedException("Request unauthorized", reason)
-
-    if not response.status_code == 200:
-        raise Exception(f"Error fetching timetables: {response.reason}")
-
-    timetable = response.json()
     records = timetable["panes"]["filter"]["records"]
 
     with open("timesheets.json", "w") as fp:
@@ -125,5 +143,6 @@ def print_records(records: list[dict]) -> None:
 
 
 if __name__ == "__main__":
-    timetable_records = read_timetables()
+    timetable_records = read_dailysheetlines()
     print_records(timetable_records)
+
