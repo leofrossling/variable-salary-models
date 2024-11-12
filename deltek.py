@@ -6,15 +6,18 @@ import os
 
 import requests
 
+
 class UnauthorizedException(Exception):
-    
+
     def __init__(self, message, reason):
         self.message = message
         super().__init__(self.message)
         self.reason = reason
 
+
 def verbose_active() -> bool:
     return "VERBOSE" in os.environ and os.environ["VERBOSE"].lower() == "true"
+
 
 def construct_auth_credentials(encoded_credentials: str = "", username: str = "", password: str = "") -> str:
     if not encoded_credentials and "DELTEK_CREDENTIALS" in os.environ:
@@ -30,11 +33,12 @@ def construct_auth_credentials(encoded_credentials: str = "", username: str = ""
 
     if not encoded_credentials or not isinstance(encoded_credentials, str):
         raise Exception("No valid authentication provided...")
-    
+
     return encoded_credentials
 
+
 def deltek_request(url: str, encoded_credentials: str) -> dict:
-    
+
     headers = {
         "Authorization": f"Basic {encoded_credentials}",
         "Accept-Language": "en-US",
@@ -42,21 +46,20 @@ def deltek_request(url: str, encoded_credentials: str) -> dict:
     }
 
     if verbose_active():
-        print(f">> Outgoing request to {url}" )
+        print(f">> Outgoing request to {url}")
     response = requests.get(url, headers=headers, timeout=30)
 
     if response.status_code == 401:
         err = response.json()
         reason = "unknown"
-        if 'errorMessage' in err:
-            reason = err['errorMessage']
+        if "errorMessage" in err:
+            reason = err["errorMessage"]
         raise UnauthorizedException("Request unauthorized", reason)
 
     if not response.status_code == 200:
         raise Exception(f"Error fetching timetables: {response.reason}")
 
     return response.json()
-
 
 
 def read_dailysheetlines(username: str = "", password: str = "") -> list[dict]:
@@ -96,9 +99,9 @@ def read_dailysheetlines(username: str = "", password: str = "") -> list[dict]:
                 return data["panes"]["filter"]["records"]
     except Exception:
         pass
-    
-    encoded_credentials = construct_auth_credentials(username=username,password=password)
-    
+
+    encoded_credentials = construct_auth_credentials(username=username, password=password)
+
     url = "https://me52774-webclient.deltekfirst.com/maconomy-api/containers/me52774/dailytimesheetlines/filter?limit=0"
 
     timetable = deltek_request(url, encoded_credentials)
@@ -145,4 +148,3 @@ def print_records(records: list[dict]) -> None:
 if __name__ == "__main__":
     timetable_records = read_dailysheetlines()
     print_records(timetable_records)
-
