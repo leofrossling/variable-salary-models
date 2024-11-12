@@ -2,10 +2,15 @@ import json
 import os
 import math
 import calendar as cal
+from termcolor import colored
 from getpass import getpass
 
 from deltek import read_dailysheetlines, UnauthorizedException
 from holiday_api import get_easter_holidays, get_ascension_day, get_midsummers_eve
+
+_rtotal_color = 'yellow'
+_rlin_color = 'blue'
+_rlon_color = 'green'
 
 def day_to_string(date):
     match date.weekday():
@@ -78,13 +83,15 @@ def daily_result(record: dict, unknown: dict):
     invoicable = record["invoiceable"]
     internaljob = record["internaljob"]
     taskname = record["taskname"]
+    desc = record["entrytext"]
 
     res = {
         'jobnumber':jobnumber,
         'activitynumber':activitynumber,
         'taskname':taskname,
         'hours':hours,
-        'type':''
+        'type':'',
+        "description": desc
     }
 
     if invoicable:
@@ -127,7 +134,7 @@ def daily_result(record: dict, unknown: dict):
         unknown[jobnumber] = {"description": jobname, "activities": {}}
     unknown[jobnumber]["activities"][activitynumber]["hours"] += hours
     if activitynumber not in unknown[jobnumber]["activities"]:
-        unknown[jobnumber]["activities"][activitynumber] = {"description": record["entrytext"], "hours": 0}
+        unknown[jobnumber]["activities"][activitynumber] = {"description": desc, "hours": 0}
 
     res['type'] = 'unknown'
     return "unknown", res
@@ -136,14 +143,17 @@ def daily_result(record: dict, unknown: dict):
 def print_report(report):
     for year in report.keys():
         for month in report[year].keys():
-            if month == "Rtotal":
+            if month == "Rtotal" or month == "Rtotal_december":
                 continue
             print(f"{year}-{month}  -  Hours for month: {report[year][month]['hours']}h")
             print(f"  Hour thresholds: ")
-            print(f"    Rtotal: {report[year][month]['hours_adjusted_rtotal']}")
-            print(f"    Rlin: {report[year][month]['hours_adjusted_rlin']}")
-            print(f"    Rlön: {report[year][month]['hours_adjusted_rlon']}")
-            print(f"  Received Rtotal={report[year][month]['Rtotal']}")
+            print(f"    {colored('Rtotal', _rtotal_color)}: {report[year][month]['hours_adjusted_rtotal']}")
+            print(f"    {colored('Rlin', _rlin_color)}: {report[year][month]['hours_adjusted_rlin']}")
+            print(f"    {colored('Rlön', _rlon_color)}: {report[year][month]['hours_adjusted_rlon']}")
+            if report[year][month]['Rtotal']:
+                print(colored("  Received Rtotal", _rtotal_color))
+            else:
+                print(colored("  Did not receive Rtotal", 'red'))
             print(f"  Rtotal hour bank={report[year][month]['rtot_bank']:.1f}h")
             print(f"  Received Rlin={report[year][month]['Rlin']:.1f}h")
             print(f"  Received Rlön={report[year][month]['Rlön']:.1f}h")
@@ -161,7 +171,8 @@ def print_report(report):
                 if taskname not in grouped_month[jobnum][actnum]:
                     grouped_month[jobnum][actnum][taskname] = {
                         'hours':0,
-                        'type':record['type']
+                        'type':record['type'],
+                        'description': record['description']
                     }
                 grouped_month[jobnum][actnum][taskname]['hours'] += record['hours']
             print("  Monthly time sheet lines with hours combined:")
@@ -170,12 +181,15 @@ def print_report(report):
                     for taskname in grouped_month[jobnumber][activitynumber].keys():
                         hours = grouped_month[jobnumber][activitynumber][taskname]['hours']
                         bonus_type = grouped_month[jobnumber][activitynumber][taskname]['type']
+                        desc = grouped_month[jobnumber][activitynumber][taskname]['description']
                         if hours == 0:
                             continue
-                        print(f"    job={jobnumber}, activity={activitynumber}, task={taskname}, {hours=:.1f}, type={bonus_type}")
+                        print(f"    {desc} - job={jobnumber}, activity={activitynumber}, task={taskname}, {hours=:.1f}, type={bonus_type}")
 
         print(f"")
         print(f"  {report[year]['Rtotal']}")
+        if 'Rtotal_december' in report[year]:
+            print(f"  {report[year]['Rtotal_december']}h carries over from December")
 
 def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
 
@@ -196,6 +210,7 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
     report = {}
 
     extra_bonus_hours_from_december = 0
+    last_day_was_billable=False
     for year in records.keys():
         if year not in report:
             report[year] = {}
@@ -220,7 +235,6 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
             rlon_vacation_hours = 0
             vab_equivalent_hours = 0
 
-            last_day_was_billable=False
             for day in records[year][month].keys():
                 day_is_billable="No"
                 for record in records[year][month][day]:
@@ -295,7 +309,7 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
 
             report[year][month]['hours_adjusted_rlon'] = 130
             h_lon = max(monthly_billed_hours + rlon_vacation_hours + rlon_billable - 130, 0)
-            year_lon_hours += monthly_billed_hours
+            year_lon_hours += monthly_billed_hours + rlon_vacation_hours
             rlin_count += h_lin
             rlon_count += h_lon
             report[year][month]['Rlin'] = h_lin
@@ -319,21 +333,30 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
         else:
             report[year]['Rtotal'] = "You have %d bonus hours, you need %d (yearly hours - 40) to qualify for retroactive RTotal" % (year_bonus_hours, (yearly_hours - 40))
         years[year] = {"rtot": rtot_count, "rlin": rlin_count, "rlon": rlon_count}
+        if extra_bonus_hours_from_december > 0:
+            report[year]['Rtotal_december'] = extra_bonus_hours_from_december
 
         print(f"-- {year} --")
-        print(f"  Rtotal payments: {rtot_count}st")
-        print(f"  Rlinear hours:   {rlin_count:.1f}h")
-        print(f"  Rlön hours:      {rlon_count:.1f}h")
+        print(f"  Rtotal payments: {colored(rtot_count, _rtotal_color)}st")
+        print(f"  Rlinear hours:   {colored(f'{rlin_count:.1f}', _rlin_color)}h")
+        print(f"  Rlön hours:      {colored(f'{rlon_count:.1f}', _rlon_color)}h")
         if year_lon_hours != year_bonus_hours:
             rtot_hours_lost= year_bonus_hours - year_lon_hours
-            print(f"  Previous Rtotal hours lost: {rtot_hours_lost:.1f}h")
+            print(f"  Previous Rtotal hours lost: {colored(f'{rtot_hours_lost:.1f}', 'red')}h")
         if len(unknown.keys()) > 0:
             print(f"  {json.dumps(unknown, indent=2)}")
         print("")
+        
+        curr_color = 'green'
+        new_color = 'red'
+        if rtot_count*rtot_val + rlin_count*rlin_val < rlon_count*rlon_val:
+            curr_color = 'red'
+            new_color = 'green'
+            
         print(f"  Total current: {rtot_count:.1f}*{rtot_val} + {rlin_count:.1f}*{rlin_val}=")
-        print(f"                 {rtot_count*rtot_val + rlin_count*rlin_val:.0f} kr")
+        print(f"                 {colored(f'{rtot_count*rtot_val + rlin_count*rlin_val:.0f}', curr_color)} kr")
         print(f"  Total new:     {rlon_count:.1f}*{rlon_val}=")
-        print(f"                 {rlon_count*rlon_val:.0f} kr")
+        print(f"                 {colored(f'{rlon_count*rlon_val:.0f}', new_color)} kr")
     return report
 
 
@@ -391,7 +414,7 @@ def the_main_program():
 
     print("")
     report = calculate_years(records)
-    if "VERBOSE" in os.environ and os.environ["VERBOSE"].lower() == "true":
+    if True or "VERBOSE" in os.environ and os.environ["VERBOSE"].lower() == "true":
         print("")
         input("Press enter to diplay monthly breakdown")
         print_report(report)
