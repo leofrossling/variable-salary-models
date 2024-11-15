@@ -162,5 +162,5 @@ cython_debug/
 #.idea/
 
 
-holidays_*.json
-timesheets.jsonr
+timesheets.json
+timesheets/

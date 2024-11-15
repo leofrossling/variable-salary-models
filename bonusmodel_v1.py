@@ -199,7 +199,7 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
         rtot_val = int(os.environ["RTOTAL"])
     if "RLIN" in os.environ:
         rlin_val = int(os.environ["RLIN"])
-    rlon_val = math.ceil(rlin_val + rtot_val / 38)
+    rlon_val = math.ceil(rlin_val + rtot_val / 37.4)
 
     print("")
     print(f"Numerical values used: Rtotal={rtot_val} kr, Rlinjär={rlin_val} kr, Rlön={rlon_val} kr")
@@ -387,12 +387,23 @@ def the_main_program():
     if "VERBOSE" not in os.environ or os.environ["VERBOSE"].lower() != "true":
         print("")
         print(f"  To diplay more information, run with envar VERBOSE=true")
+
+    print("")
+    print("  This programm will is inteded to compare the current traditional salary model")
+    print("  with the proposed changes to the salary model.")
+    print("  NOTE: Some features are not implemented, such as parental leave or part-time leave.")
+    print("  NOTE: Calculations in realtion to VAB are not thorougly tested.")
+    print("")
+
     records = []
     try:
         records = read_dailysheetlines()
     except Exception:
-        print("Enter username: ")
-        username = input()
+        print("")
+        print("  This program will use your Deltek credentials to download your reported timesheet lines.")
+        print("  The credentials are not stored, but the timesheet lines are. They can be deleted after the program is run.")
+        print("")
+        username = input("Enter Deltek username: ")
         password = getpass()
         try:
             records = read_dailysheetlines(username=username, password=password)

@@ -1,0 +1,110 @@
+[
+  {
+    "country": "Sweden",
+    "iso": "SE",
+    "year": 2024,
+    "date": "2024-05-01",
+    "day": "Wednesday",
+    "name": "May 1st",
+    "type": "PUBLIC_HOLIDAY"
+  },
+  {
+    "country": "Sweden",
+    "iso": "SE",
+    "year": 2024,
+    "date": "2024-06-06",
+    "day": "Thursday",
+    "name": "National day",
+    "type": "PUBLIC_HOLIDAY"
+  },
+  {
+    "country": "Sweden",
+    "iso": "SE",
+    "year": 2024,
+    "date": "2024-03-29",
+    "day": "Friday",
+    "name": "Good Friday",
+    "type": "PUBLIC_HOLIDAY"
+  },
+  {
+    "country": "Sweden",
+    "iso": "SE",
+    "year": 2024,
+    "date": "2024-06-22",
+    "day": "Saturday",
+    "name": "Midsummer Day",
+    "type": "PUBLIC_HOLIDAY"
+  },
+  {
+    "country": "Sweden",
+    "iso": "SE",
+    "year": 2024,
+    "date": "2024-05-19",
+    "day": "Sunday",
+    "name": "Whit Sunday",
+    "type": "PUBLIC_HOLIDAY"
+  },
+  {
+    "country": "Sweden",
+    "iso": "SE",
+    "year": 2024,
+    "date": "2024-05-09",
+    "day": "Thursday",
+    "name": "Ascension Day",
+    "type": "PUBLIC_HOLIDAY"
+  },
+  {
+    "country": "Sweden",
+    "iso": "SE",
+    "year": 2024,
+    "date": "2024-04-01",
+    "day": "Monday",
+    "name": "Easter Monday",
+    "type": "PUBLIC_HOLIDAY"
+  },
+  {
+    "country": "Sweden",
+    "iso": "SE",
+    "year": 2024,
+    "date": "2024-12-26",
+    "day": "Thursday",
+    "name": "Boxing Day",
+    "type": "PUBLIC_HOLIDAY"
+  },
+  {
+    "country": "Sweden",
+    "iso": "SE",
+    "year": 2024,
+    "date": "2024-01-06",
+    "day": "Saturday",
+    "name": "Epiphany",
+    "type": "PUBLIC_HOLIDAY"
+  },
+  {
+    "country": "Sweden",
+    "iso": "SE",
+    "year": 2024,
+    "date": "2024-11-02",
+    "day": "Saturday",
+    "name": "All Saints' Day",
+    "type": "PUBLIC_HOLIDAY"
+  },
+  {
+    "country": "Sweden",
+    "iso": "SE",
+    "year": 2024,
+    "date": "2024-12-25",
+    "day": "Wednesday",
+    "name": "Christmas Day",
+    "type": "PUBLIC_HOLIDAY"
+  },
+  {
+    "country": "Sweden",
+    "iso": "SE",
+    "year": 2024,
+    "date": "2024-01-01",
+    "day": "Monday",
+    "name": "New Year's Day",
+    "type": "PUBLIC_HOLIDAY"
+  }
+]

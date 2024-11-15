@@ -1,10 +1,11 @@
 import requests
 import os
 import json
+from termcolor import colored
 
 
 def fetch_holidays_for_year(year) -> dict:
-    file_name = f"holidays_{year}.json"
+    file_name = f"holidays/holidays_{year}.json"
     try:
         with open(file_name, "r") as fp:
             data = json.load(fp)
@@ -13,6 +14,10 @@ def fetch_holidays_for_year(year) -> dict:
         pass
 
     if "API_NINJA_KEY" not in os.environ:
+        print("")
+        print(colored("ERROR: ", 'red') + "Cached data not found and no API_NINJA_KEY environment variable not present")
+        print(colored("ERROR: ", 'red') + "Calculations will be incorrect because easter and other holidays will not be taken into account")
+        print("         Get a key from https://api-ninjas.com/ to fetch holiday information")
         return []
     key = os.environ["API_NINJA_KEY"]
     
