@@ -117,6 +117,8 @@ def daily_result(record: dict, unknown: dict):
         match res['taskname']:
             case "120":
                 bonus_type = "vacation"
+            case "130":
+                bonus_type = "parental"
             case "140":
                 bonus_type = "VAB"
             case _:
@@ -263,7 +265,9 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]]):
                                 rlon_billable += parsed_record['hours']
                                 parsed_record['type'] += " /w bonus"
                             day_is_billable="Förtroendeuppdrag"
-                        case "VAB" | "Föräldraledighet":
+                        case "VAB":
+                            vab_equivalent_hours += parsed_record['hours']
+                        case "parental":
                             vab_equivalent_hours += parsed_record['hours']
                         case "bonus":
                             monthly_bonus_hours += parsed_record['hours']
@@ -391,8 +395,7 @@ def the_main_program():
     print("")
     print("  This programm will is inteded to compare the current traditional salary model")
     print("  with the proposed changes to the salary model.")
-    print("  NOTE: Some features are not implemented, such as parental leave or part-time leave.")
-    print("  NOTE: Calculations in realtion to VAB are not thorougly tested.")
+    print("  NOTE: Some features are not implemented, such as part-time parental leave or part-time leave.")
     print("")
 
     records = []
