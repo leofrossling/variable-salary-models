@@ -1,7 +1,8 @@
-import requests
-import os
 import json
 from termcolor import colored
+import os
+
+import requests
 
 
 def fetch_holidays_for_year(year) -> dict:
@@ -20,7 +21,7 @@ def fetch_holidays_for_year(year) -> dict:
         print("         Get a key from https://api-ninjas.com/ to fetch holiday information")
         return []
     key = os.environ["API_NINJA_KEY"]
-    
+
     headers = {
         "X-Api-Key": key,
     }
@@ -34,11 +35,12 @@ def fetch_holidays_for_year(year) -> dict:
         raise Exception(f"Error fetching timetables: {response.reason}")
 
     holidays = response.json()
-    
+
     with open(file_name, "w") as fp:
         json.dump(holidays, fp)
 
     return holidays
+
 
 def get_easter_holidays(year):
     goodfriday = "error"
@@ -46,32 +48,34 @@ def get_easter_holidays(year):
     holidays = fetch_holidays_for_year(year)
 
     for holiday in holidays:
-        if holiday['name'] == "Good Friday":
+        if holiday["name"] == "Good Friday":
             # print("Långfredag är " + holiday['date'])
-            goodfriday = holiday['date']
-        if holiday['name'] == "Easter Monday":
-            # print("Annandag påsk är " + holiday['date'])    
-            eastermonday = holiday['date']
-    
+            goodfriday = holiday["date"]
+        if holiday["name"] == "Easter Monday":
+            # print("Annandag påsk är " + holiday['date'])
+            eastermonday = holiday["date"]
+
     return goodfriday, eastermonday
+
 
 def get_ascension_day(year):
     day = "error"
     holidays = fetch_holidays_for_year(year)
 
     for holiday in holidays:
-        if holiday['name'] == "Ascension Day":
-            day = holiday['date']
-    
+        if holiday["name"] == "Ascension Day":
+            day = holiday["date"]
+
     return day
+
 
 def get_midsummers_eve(year):
     day = "error"
     holidays = fetch_holidays_for_year(year)
 
     for holiday in holidays:
-        if holiday['name'] == "Midsummer Day":
-            day = holiday['date']
+        if holiday["name"] == "Midsummer Day":
+            day = holiday["date"]
     if day != "error":
         parts = [int(x) for x in day.split("-")]
         parts[2] -= 1

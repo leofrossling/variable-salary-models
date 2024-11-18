@@ -1,0 +1,32 @@
+{
+  "9830Internt": {
+    "bonus_type": "internal",
+    "activities": {
+      "any": {
+        "tasks": {
+          "181": {
+            "bonus_type": "bonus"
+          },
+          "280": {
+            "bonus_type": "förtroendeuppdrag"
+          }
+        }
+      }
+    }
+  },
+  "9930Frånvaro": {
+    "bonus_type": "internal",
+    "activities": {
+      "any": {
+        "tasks": {
+          "120": {
+            "bonus_type": "vacation"
+          },
+          "140": {
+            "bonus_type": "VAB"
+          }
+        }
+      }
+    }
+  }
+}
