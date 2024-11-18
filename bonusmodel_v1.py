@@ -78,7 +78,7 @@ def get_monthly_billable_hours_by_year(year: int):
 
 
 # return: interntid, rtotalgrundande, rlingrundande, okänt
-def daily_result(record: dict, unknown: dict, mapper: timecode_mapping):
+def daily_result(record: dict, unknown: dict):
 
     hours = record["numbertransferred"]
     jobnumber = record["jobnumber"]
@@ -94,7 +94,7 @@ def daily_result(record: dict, unknown: dict, mapper: timecode_mapping):
         'activitynumber':activitynumber,
         'taskname':taskname,
         'hours':hours,
-        'type':'',
+        'type':'unknown',
         "description": desc
     }
 
@@ -108,7 +108,7 @@ def daily_result(record: dict, unknown: dict, mapper: timecode_mapping):
             case _:
                 bonus_type = "internal"
         res['type'] = bonus_type
-        return bonus_type, res 
+        return res 
     
     if "9930Frånvaro" == jobnumber:
         bonus_type = ""
@@ -122,22 +122,24 @@ def daily_result(record: dict, unknown: dict, mapper: timecode_mapping):
             case _:
                 bonus_type = "internal"
         res['type'] = bonus_type
-        return bonus_type, res 
+        return res 
 
     if internaljob and not invoicable:
-        bonus_type = "internal"
-        res['type'] = bonus_type
-        return bonus_type, res 
+        res['type'] = "internal"
+        return res 
 
+    if invoicable:
+        res['type'] = 'billable'
+        return res 
         
     if jobnumber not in unknown:
         unknown[jobnumber] = {"description": jobname, "activities": {}}
-    unknown[jobnumber]["activities"][activitynumber]["hours"] += hours
     if activitynumber not in unknown[jobnumber]["activities"]:
         unknown[jobnumber]["activities"][activitynumber] = {"description": desc, "hours": 0}
+    unknown[jobnumber]["activities"][activitynumber]["hours"] += hours
 
     res['type'] = 'unknown'
-    return "unknown", res
+    return res
 
 
 def print_report(report):
@@ -177,10 +179,13 @@ def print_report(report, output_file=sys.stdout):
             month_data = report["years"][year]["months"][month]
             print(f"{year}-{month}  -  Hours for month: {month_data['hours']}h", file=output_file)
             print(f"  Hour thresholds: ", file=output_file)
-            print(f"    Rtotal: {month_data['hours_adjusted_rtotal']}", file=output_file)
-            print(f"    Rlin: {month_data['hours_adjusted_rlin']}", file=output_file)
-            print(f"    Rlön: {month_data['hours_adjusted_rlon']}", file=output_file)
-            print(f"  Received Rtotal={month_data['Rtotal']}", file=output_file)
+            print(f"    {colored('Rtotal', _rtotal_color)}: {month_data['hours_adjusted_rtotal']}", file=output_file)
+            print(f"    {colored('Rlin', _rlin_color)}: {month_data['hours_adjusted_rlin']}", file=output_file)
+            print(f"    {colored('Rlön', _rlon_color)}: {month_data['hours_adjusted_rlon']}", file=output_file)
+            if month_data['Rtotal']:
+                print(colored("  Received Rtotal", _rtotal_color), file=output_file)
+            else:
+                print(colored("  Did not receive Rtotal", 'red'), file=output_file)
             print(f"  Rtotal hour bank={month_data['rtot_bank']:.1f}h", file=output_file)
             print(f"  Received Rlin={month_data['Rlin']:.1f}h", file=output_file)
             print(f"  Received Rlön={month_data['Rlön']:.1f}h", file=output_file)
@@ -214,9 +219,9 @@ def print_report(report, output_file=sys.stdout):
                         print(f"    {desc} - job={jobnumber}, activity={activitynumber}, task={taskname}, {hours=:.1f}, type={bonus_type}")
 
         print(f"")
-        print(f"  {report[year]['Rtotal']}")
-        if 'Rtotal_december' in report[year]:
-            print(f"  {report[year]['Rtotal_december']}h carries over from December")
+        print(f"  {report['years'][year]['info']['Rtotal']}")
+        if 'Rtotal_december' in report['years'][year]['info']:
+            print(f"  {report['years'][year]['info']['Rtotal_december']}h carries over from December")
 
 
 def print_yearly_report(report, output_file=sys.stdout):
@@ -244,8 +249,6 @@ def print_yearly_report(report, output_file=sys.stdout):
 
 
 def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]], unknown: dict = {}):
-    mapper = state["mapping"]
-
     rtot_val = 2000
     rlin_val = 40
     if "RTOTAL" in os.environ:
@@ -288,7 +291,7 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]], unknow
             for day in records[year][month].keys():
                 day_is_billable = "No"
                 for record in records[year][month][day]:
-                    parsed_record = daily_result(record, unknown, mapper)
+                    parsed_record = daily_result(record, unknown)
 
                     report["years"][year]["months"][month]["records"].append(parsed_record)
                     match parsed_record["type"]:
@@ -397,7 +400,7 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]], unknow
             )
         years[year] = {"rtot": rtot_count, "rlin": rlin_count, "rlon": rlon_count}
         if extra_bonus_hours_from_december > 0:
-            report[year]['Rtotal_december'] = extra_bonus_hours_from_december
+            report["years"][year]['Rtotal_december'] = extra_bonus_hours_from_december
 
         print(f"-- {year} --")
         print(f"  Rtotal payments: {colored(rtot_count, _rtotal_color)}st")
