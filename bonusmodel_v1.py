@@ -255,7 +255,7 @@ def calculate_years(records: dict[int, dict[int, dict[int, list[dict]]]], unknow
         rtot_val = int(os.environ["RTOTAL"])
     if "RLIN" in os.environ:
         rlin_val = int(os.environ["RLIN"])
-    rlon_val = math.ceil(rlin_val + rtot_val / 37.4)
+    rlon_val = math.ceil(rlin_val + rtot_val / 37)
 
     years = {}
     report = {"info": {}, "years": {}}
